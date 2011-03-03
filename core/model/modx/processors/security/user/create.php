@@ -11,7 +11,10 @@
 if (!$modx->hasPermission(array('access_permissions' => true, 'new_user' => true))) return $modx->error->failure($modx->lexicon('permission_denied'));
 $modx->lexicon->load('user');
 
-$user = $modx->newObject('modUser');
+/* setup default properties */
+$classKey = $modx->getOption('class_key',$scriptProperties,'modUser');
+
+$user = $modx->newObject($classKey);
 
 /* validate post */
 $blocked = empty($scriptProperties['blocked']) ? false : true;
@@ -19,14 +22,6 @@ $blocked = empty($scriptProperties['blocked']) ? false : true;
 $newPassword= '';
 $result = include_once $modx->getOption('processors_path').'security/user/_validation.php';
 if ($result !== true) return $result;
-
-
-/* invoke OnBeforeUserFormSave event */
-$modx->invokeEvent('OnBeforeUserFormSave',array(
-    'mode' => modSystemEvent::MODE_NEW,
-    'id' => $scriptProperties['id'],
-    'user' => &$user,
-));
 
 /* create user group links */
 if (isset($scriptProperties['groups'])) {
@@ -39,6 +34,16 @@ if (isset($scriptProperties['groups'])) {
         $ugms[] = $ugm;
     }
     $user->addMany($ugms,'UserGroupMembers');
+}
+
+/* invoke OnBeforeUserFormSave event */
+$OnBeforeUserFormSave = $modx->invokeEvent('OnBeforeUserFormSave',array(
+    'mode' => modSystemEvent::MODE_NEW,
+    'user' => &$user,
+));
+$canSave = $this->processEventResponse($OnBeforeUserFormSave);
+if (!empty($canSave)) {
+    return $modx->error->failure($canSave);
 }
 
 /* update user */
